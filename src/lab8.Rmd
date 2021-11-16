@@ -1,0 +1,143 @@
+---
+title: "Lab8"
+author: "Sage Davis"
+date: "11/16/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(modelsummary)
+library(corrplot)
+library(broom)
+library(here)
+```
+
+```{r}
+homes <- read_csv(here("data", "slo_homes.csv"))
+
+# unique(homes$City) in console
+
+```
+
+Create a subset with 4 cities
+
+Taslk: create a subset (calleds homes_subset) that only contains 
+San lius
+Atascadero
+Arroyo Grande
+Santa Maria -Orcutt
+
+```{r}
+homes_subset <- homes %>% 
+  filter(City %in% c("San Luis Obispo", "Atascadero", "Arroyo Grande", "Santa Maria-Orcutt"))
+
+# unique(homes_subset$City) in console
+
+```
+
+TAsk create as sumary table that has the mean and sd of home prices frouped by city and sale status
+
+```{r include = FALSE}
+# eval = FALSE  means do not run chunk
+
+# can directly pipe from homes_subset, but its not saved
+
+homes_subset_table <- homes_subset %>% 
+  group_by(City, Status) %>% 
+  summarize(mean_price = mean(Price),
+            sd_price = sd(Price),
+            mean_sqft = mean(SqFt))  # extra
+
+```
+
+Task: explore the rel. betw sqft and home price fom data
+
+```{r}
+
+ggplot(data = homes_subset, aes(x = SqFt, y = Price,)) +
+  geom_jitter(color = "dark green") +
+  theme_minimal() +
+  geom_smooth(method = lm, color = "purple")  # model = lm follows average
+
+# Looks like a linear rel w/ a positive correlation with square foot age and home prices
+
+```
+
+
+### Try a few linear models
+
+Use multiple Lm to investigate rel betw several predictor variables and Home Price
+
+Choose 2 diff permutations od this model
+
+[1] Pricee ~City, Bedrooms, Bathrooms, SqFt, Status (lm1)
+[2] Price ~ City, SqFt, Status(lm2)
+[3]  Tyr another one
+
+```{r}
+
+lm1 <- lm(Price ~ City + Bedrooms + Bathrooms + SqFt + Status, data = homes_subset)
+
+# lm2 R^2 sq value only slight lower.  Look at AIC
+
+lm2 <- lm(Price ~ City + SqFt + Status, data = homes_subset)
+
+lm3 <- lm(Price ~ City + SqFt, data = homes_subset)
+
+# use summary(lm1) to see results
+
+# Co-linearly can cause strange values LIKE - 61750 per bedroom
+# R^2 (0.54) almost 54% of home price that is explained by in the model.
+# p-value says we are doing much better at predictig a home price 
+# than just guessing
+
+# If I wanted San Luis to be reference level
+# use fct_relevel to specify a new ref level
+
+new_homes_subset <- homes_subset %>% 
+  mutate(City = fct_relevel(City, "San Luis Ospisbo"))
+```
+
+### Eplore corelations betw quant variables
+
+Task:make a subste that only contains the variables (homes_subset) Price thrugh SqFt
+
+```{r}
+
+homes_quant <- homes_subset %>% 
+  select(Price:SqFt)
+
+homes_core <- cor(homes_quant) # correlation function
+
+corrplot(homes_core, method = "ellipse")
+
+```
+### Compare AIC values
+
+```{r}
+# lower AIC value is better, lm1 is better even with more variables.  Which is actually better? Who knows. Include both?  Thinking about the models and the data is the hard part.  
+AIC(lm1)
+AIC(lm2)
+```
+
+### use model summary to return multiple model outputs
+
+```{r}
+modelsummary(list(lm1, lm2))
+
+plot(lm1)
+```
+
+### Use broom::augment to return the prediction for existing observations
+```{r}
+# Can looks at what the .fitted values
+home_predictions <- augment(lm1)
+
+
+ggplot(home_predictions, aes(x = .resid)) +
+  geom_histogram()
+
+```
